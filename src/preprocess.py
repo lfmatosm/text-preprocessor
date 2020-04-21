@@ -51,11 +51,12 @@ def main():
     original_data_path = sys.argv[1]
     field_of_interest = sys.argv[2]
     lang = sys.argv[3]
-    lemmatize_activated = bool(sys.argv[4])
+    lemmatize_activated = str(sys.argv[4]) == "True"
 
     print("Path: ", original_data_path)
     print("Field: ", field_of_interest)
     print("Language: ", lang)
+    print("Is to lemmatize data? ", lemmatize_activated)
 
     data_string = json.load(open(original_data_path, READ_MODE))
 
