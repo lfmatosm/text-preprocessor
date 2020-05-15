@@ -13,6 +13,10 @@ FILE_EXTENSION = ".json"
 WRITE_MODE = "w"
 READ_MODE = "r"
 
+
+UNDESIRED_WORDS_LIST = ["https", "http", "www"]
+
+
 def get_filename(path):
     lowercase_path = path.lower()
 
@@ -35,12 +39,12 @@ def is_jp_word(word):
     return any([ is_cjk(char) for char in word ])
 
 
-def has_jp_word(text):
-    return any(list(map(lambda word: is_jp_word(word), text)))
+def has_undesired_word(text):
+    return any(list(map(lambda word: (is_jp_word(word) or word in UNDESIRED_WORDS_LIST), text)))
 
 
-def remove_japanese_words(df):
-    return df[df['body'].map(lambda text: has_jp_word(text)) == False]
+def remove_undesired_words(df):
+    return df[df['body'].map(lambda text: has_undesired_word(text)) == False]
 
 
 def main():
@@ -82,19 +86,19 @@ def main():
 
     print("Row count after bots' posts removal: ", len(df_without_bot_posts))
 
-    df_without_jp_words = remove_japanese_words(df_without_bot_posts)
+    df_without_undesired_words = remove_undesired_words(df_without_bot_posts)
 
-    print("Row count after japanese words removal: ", len(df_without_jp_words))
+    print("Row count after undesired words removal: ", len(df_without_undesired_words))
 
     output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[duplicates_bots_removed]" + FILE_EXTENSION
 
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
-    json.dump(df_without_jp_words.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
+    json.dump(df_without_undesired_words.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
 
     print("Data without duplicates dumped to ", output_filepath)
 
-    data = np.array(df_without_jp_words[field_of_interest], dtype = 'object')
+    data = np.array(df_without_undesired_words[field_of_interest], dtype = 'object')
 
     processor = Preprocessor(lang, lemmatize_activated)
 
@@ -102,7 +106,7 @@ def main():
 
     print("Size of data after preprocessing: ", len(processed_data))
 
-    df_after_preprocessing = df_without_jp_words.assign(body=processed_data)
+    df_after_preprocessing = df_without_undesired_words.assign(body=processed_data)
 
     df_after_preprocessing= df_after_preprocessing[df_after_preprocessing['body'].map(lambda field: len(field)) > 0]
 
