@@ -108,7 +108,11 @@ def main():
 
     df_after_preprocessing = df_without_undesired_words.assign(body=processed_data)
 
-    df_after_preprocessing= df_after_preprocessing[df_after_preprocessing['body'].map(lambda field: len(field)) > 0]
+    df_after_removal_of_undesired_words = remove_undesired_words(df_after_preprocessing)
+
+    print("Row count after undesired words removal: ", len(df_without_undesired_words))
+
+    df_after_preprocessing = df_after_removal_of_undesired_words[df_after_removal_of_undesired_words['body'].map(lambda field: len(field)) > 0]
 
     print(f'Row count after removal of rows with empty "{field_of_interest}" fields: {len(df_after_preprocessing)}')
 
