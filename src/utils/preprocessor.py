@@ -28,6 +28,11 @@ class Preprocessor:
     def filter_documents_with_less_than(self, tokenized_documents, min_words=5):
         return list(filter(lambda tokenized_text: len(tokenized_text) > min_words, tokenized_documents))
 
+    
+    #Removes small words from documents
+    def remove_small_words(self, tokenized_documents, min_length=3):
+        return [list(filter(lambda word: len(word) > min_length, document)) for document in tokenized_documents]
+
 
     #Removes stopwords
     def remove_stopwords(self, texts):
@@ -61,12 +66,16 @@ class Preprocessor:
 
         print("Stopwords removed.")
 
+        data_without_small_words = self.remove_small_words(data_without_stopwords)
+
+        print("Small words/tokens removed.")
+
         if (self.__lemmatize_activated):
 
-            lemmatized_data = self.lemmatize(data_without_stopwords)
+            lemmatized_data = self.lemmatize(data_without_small_words)
 
             print("Lemmatized data.")
 
             return lemmatized_data
 
-        return data_without_stopwords
+        return data_without_small_words
