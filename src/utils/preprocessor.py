@@ -6,8 +6,9 @@ import re
 
 #Makes basic, generic preprocessing on documents corpus
 class Preprocessor:
-    def __init__(self, language="en", lemmatize_activated=True):
+    def __init__(self, pos_categories, language="en", lemmatize_activated=True):
         self.__lemmatize_activated = lemmatize_activated
+        self.__pos_categories = pos_categories
 
         self.__nlp = spacy.load("pt_core_news_sm") if (language == "pt") else spacy.load("en")
         self.__stop_words = stopwords.words("portuguese") if (language == "pt") else stopwords.words("english")
@@ -35,47 +36,55 @@ class Preprocessor:
 
 
     #Removes stopwords
-    def remove_stopwords(self, texts):
-        return [[word for word in doc if word not in self.__stop_words] for doc in texts]
+    def remove_stopwords(self, texts, additional_stopwords=None):
+        documents = [[word for word in doc if word not in self.__stop_words] for doc in texts]
+
+        return documents if additional_stopwords == None else [[word for word in doc if word not in additional_stopwords] for doc in documents]
 
 
     #Transforms each word into its base form. e.g. 'fazendo' becomes 'fazer'
-    def lemmatize(self, documents, allowed_postags=['NOUN', 'ADJ', 'VERB', 'ADV']):
-        texts_out = []
+    def lemmatize(self, documents):
+        return [[ token.lemma_ for token in document ] for document in documents]
+    
+
+    #For each word, produces a (word, pos, lemma) pair where pos is the part-of-speech category of the given word/token
+    def filter_part_of_speech_tags(self, documents, categories):
+        tokens_with_pos = []
+
         for document in documents:
-            doc = self.__nlp(" ".join(document)) 
-            texts_out.append([token.lemma_ for token in doc if token.pos_ in allowed_postags])
-        return texts_out
+            doc_string = self.__nlp(" ".join(document))
+            tokens_with_pos.append([ token.lemma_ for token in doc_string if token.pos_ in categories])
+
+        return tokens_with_pos
+    
+
+    #Removes POS categories not explicitly specified to be kept on the corpus.
+    def filter_part_of_speech_categories(self, documents, categories):
+        return [[ token for token, pos in document if pos in categories ] for document in documents]
 
 
     #Removes undesired chars (like newlines), break documents into words lists,
     # remove stopwords and smaller length documents from original data
-    def preprocess(self, data):
+    def preprocess(self, data, stopwords_file_path=None):
         data_without_newlines = self.remove_newlines_and_single_quotes(data)
 
         print("Newlines and single-quotes removed from documents")
 
         #Breaks each document into a list of words
-        tokenize = lambda texts: [(yield simple_preprocess(text, deacc=True)) for text in texts]
+        tokenize = lambda texts: [(yield simple_preprocess(text, deacc=True, min_len=1)) for text in texts]
 
         tokenized_data = tokenize(data_without_newlines)
 
         print("Tokenized documents.")
 
-        data_without_stopwords = self.remove_stopwords(tokenized_data)
+        tokens_with_pos = self.filter_part_of_speech_tags(tokenized_data, self.__pos_categories)
+
+        print(f'{", ".join(self.__pos_categories)} POS categories of tokens kept and lemmatized.')
+
+        additional_stopwords = open(stopwords_file_path, "r").read().split(",") if stopwords_file_path != None else None
+
+        data_without_stopwords = self.remove_stopwords(tokens_with_pos, additional_stopwords)
 
         print("Stopwords removed.")
 
-        data_without_small_words = self.remove_small_words(data_without_stopwords)
-
-        print("Small words/tokens removed.")
-
-        if (self.__lemmatize_activated):
-
-            lemmatized_data = self.lemmatize(data_without_small_words)
-
-            print("Lemmatized data.")
-
-            return lemmatized_data
-
-        return data_without_small_words
+        return self.remove_small_words(data_without_stopwords)

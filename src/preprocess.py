@@ -6,6 +6,7 @@ import json
 import re
 import os
 from nltk.tokenize.util import is_cjk
+import argparse
 
 
 OUTPUT_PATH = "data/processed/"
@@ -47,83 +48,90 @@ def remove_undesired_words(df):
     return df[df['body'].map(lambda text: has_undesired_word(text)) == False]
 
 
-def main():
-    if (len(sys.argv) < 5):
-        print("You need to tell the JSON file path, the field to be processed, the documents' language and if you want (or not) to lemmatize words!")
-        return None
 
-    original_data_path = sys.argv[1]
-    field_of_interest = sys.argv[2]
-    lang = sys.argv[3]
-    lemmatize_activated = str(sys.argv[4]) == "True"
+parser = argparse.ArgumentParser(description='Preprocessor for dataset preprocessing: stopwords removal, lemmatization, duplicate records filtering and etcetera.')
 
-    print("Path: ", original_data_path)
-    print("Field: ", field_of_interest)
-    print("Language: ", lang)
-    print("Is to lemmatize data? ", lemmatize_activated)
+parser.add_argument('--datasetFile', type=str, help='dataset file', required=True)
+parser.add_argument('--stopwordsFile', type=str, help='additional stop-words file', required=False)
+parser.add_argument('--field', type=str, help='field to be processed', required=True)
+parser.add_argument('--lang', type=str, help='dataset language: string "en" or "pt"', required=True)
+parser.add_argument('--lemmatize', type=bool, help='should lemmatize data?', required=True)
+parser.add_argument('--desiredPos', nargs='+', help='part-of-speech categories to keep. These are simple Spacy POS categories', required=True)
 
-    data_string = json.load(open(original_data_path, READ_MODE))
+args = parser.parse_args()
 
-    original_data_frame = pd.DataFrame.from_dict(data_string)
+original_data_path = args.datasetFile
+stopwords_file = args.stopwordsFile
+field_of_interest = args.field
+lang = args.lang
+lemmatize_activated = args.lemmatize
+posCategories = args.desiredPos
 
-    print(original_data_frame.head())
+print("Path: ", original_data_path)
+if stopwords_file != None: print("Additional stopwords file: ", stopwords_file)
+print("Field: ", field_of_interest)
+print("Language: ", lang)
+print("Is to lemmatize data? ", lemmatize_activated)
+print("POS categories to keep: ", posCategories)
 
-    print("Original data row count: ", len(original_data_frame))
+data_string = json.load(open(original_data_path, READ_MODE))
 
-    df_without_duplicates = original_data_frame.drop_duplicates(subset=['body'], keep='first')
+original_data_frame = pd.DataFrame.from_dict(data_string)
 
-    print("Row count after duplicates removal: ", len(df_without_duplicates))
+print(original_data_frame.head())
 
-    df_deleted_posts_removed = df_without_duplicates[df_without_duplicates.body != "[deleted]"]
+print("Original data row count: ", len(original_data_frame))
 
-    print("Row count after deleted posts removal: ", len(df_deleted_posts_removed))
+df_without_duplicates = original_data_frame.drop_duplicates(subset=['body'], keep='first')
 
-    df_empty_posts_removed = df_deleted_posts_removed[df_deleted_posts_removed.body != ""]
+print("Row count after duplicates removal: ", len(df_without_duplicates))
 
-    print("Row count after empty posts removal: ", len(df_empty_posts_removed))
+df_deleted_posts_removed = df_without_duplicates[df_without_duplicates.body != "[deleted]"]
 
-    df_without_bot_posts = remove_bots_posts(df_empty_posts_removed)
+print("Row count after deleted posts removal: ", len(df_deleted_posts_removed))
 
-    print("Row count after bots' posts removal: ", len(df_without_bot_posts))
+df_empty_posts_removed = df_deleted_posts_removed[df_deleted_posts_removed.body != ""]
 
-    df_without_undesired_words = remove_undesired_words(df_without_bot_posts)
+print("Row count after empty posts removal: ", len(df_empty_posts_removed))
 
-    print("Row count after undesired words removal: ", len(df_without_undesired_words))
+df_without_bot_posts = remove_bots_posts(df_empty_posts_removed)
 
-    output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[duplicates_bots_removed]" + FILE_EXTENSION
+print("Row count after bots' posts removal: ", len(df_without_bot_posts))
 
-    os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+df_without_undesired_words = remove_undesired_words(df_without_bot_posts)
 
-    json.dump(df_without_undesired_words.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
+print("Row count after undesired words removal: ", len(df_without_undesired_words))
 
-    print("Data without duplicates dumped to ", output_filepath)
+output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[duplicates_bots_removed]" + FILE_EXTENSION
 
-    data = np.array(df_without_undesired_words[field_of_interest], dtype = 'object')
+os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
-    processor = Preprocessor(lang, lemmatize_activated)
+json.dump(df_without_undesired_words.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
 
-    processed_data = processor.preprocess(data)
+print("Data without duplicates dumped to ", output_filepath)
 
-    print("Size of data after preprocessing: ", len(processed_data))
+data = np.array(df_without_undesired_words[field_of_interest], dtype = 'object')
 
-    df_after_preprocessing = df_without_undesired_words.assign(body=processed_data)
+processor = Preprocessor(posCategories, lang, lemmatize_activated)
 
-    df_after_removal_of_undesired_words = remove_undesired_words(df_after_preprocessing)
+processed_data = processor.preprocess(data, stopwords_file)
 
-    print("Row count after undesired words removal: ", len(df_without_undesired_words))
+print("Size of data after preprocessing: ", len(processed_data))
 
-    df_after_preprocessing = df_after_removal_of_undesired_words[df_after_removal_of_undesired_words['body'].map(lambda field: len(field)) > 0]
+df_after_preprocessing = df_without_undesired_words.assign(body=processed_data)
 
-    print(f'Row count after removal of rows with empty "{field_of_interest}" fields: {len(df_after_preprocessing)}')
+df_after_removal_of_undesired_words = remove_undesired_words(df_after_preprocessing)
 
-    output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[processed]" + FILE_EXTENSION
+print("Row count after undesired words removal: ", len(df_without_undesired_words))
 
-    os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+df_after_preprocessing = df_after_removal_of_undesired_words[df_after_removal_of_undesired_words['body'].map(lambda field: len(field)) > 0]
 
-    json.dump(df_after_preprocessing.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
+print(f'Row count after removal of rows with empty "{field_of_interest}" fields: {len(df_after_preprocessing)}')
 
-    print("Data dumped to ", output_filepath)
+output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[processed]" + FILE_EXTENSION
 
+os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
+json.dump(df_after_preprocessing.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
 
-main()
+print("Data dumped to ", output_filepath)
