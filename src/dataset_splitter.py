@@ -1,8 +1,15 @@
-import argparse, json, os
+import argparse, json, os, pandas as pd
 from datetime import datetime
 
 DATASET_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 ARGS_DATE_FORMAT = '%Y-%m-%d'
+
+
+def remove_bots_posts(dataset):
+    bots = ["AutoModerator", "RemindMeBot", "WikiTextBot", "youtubefactsbot", "RedditNiobioBot", "NemLiNemLereiBot"]
+
+    return list(filter(lambda data: (data['author'] == None) or (data['author'] != None and data['author']['name'] not in bots), dataset))
+
 
 parser = argparse.ArgumentParser(description='Splits a dataset into others using years as delimiter.')
 
@@ -13,6 +20,28 @@ parser.add_argument('--years', nargs='+', help='years to use as delimiters while
 args = parser.parse_args()
 
 original_dataset = json.load(open(args.dataset, 'r'))
+
+print("Original row count: ", len(original_dataset))
+
+original_dataset = remove_bots_posts(original_dataset)
+
+print("Row count after bots' posts removal: ", len(original_dataset))
+
+original_data_frame = pd.DataFrame.from_dict(original_dataset)
+
+df_without_duplicates = original_data_frame.drop_duplicates(subset=['body'], keep='first')
+
+print("Row count after duplicates removal: ", len(df_without_duplicates))
+
+df_deleted_posts_removed = df_without_duplicates[df_without_duplicates.body != "[deleted]"]
+
+print("Row count after deleted posts removal: ", len(df_deleted_posts_removed))
+
+df_empty_posts_removed = df_deleted_posts_removed[df_deleted_posts_removed.body != ""]
+
+print("Row count after empty posts removal: ", len(df_empty_posts_removed))
+
+original_dataset = df_empty_posts_removed.to_dict(orient='records')
 
 dataset_name = args.dataset.split('/')[-1]
 
@@ -26,7 +55,7 @@ for year_string in args.years:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     json.dump(year_dataset, open(path, 'w'))
 
-path = f'{args.outputPath}/{dataset_name}_[original_dataset].json'
+path = f'{args.outputPath}/{dataset_name}_[original_dataset_without_duplicates].json'
 os.makedirs(os.path.dirname(path), exist_ok=True)
 json.dump(original_dataset, open(path, 'w'))
 

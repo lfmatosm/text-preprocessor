@@ -80,37 +80,37 @@ original_data_frame = pd.DataFrame.from_dict(data_string)
 
 print(original_data_frame.head())
 
-print("Original data row count: ", len(original_data_frame))
+# print("Original data row count: ", len(original_data_frame))
 
-df_without_duplicates = original_data_frame.drop_duplicates(subset=['body'], keep='first')
+# df_without_duplicates = original_data_frame.drop_duplicates(subset=['body'], keep='first')
 
-print("Row count after duplicates removal: ", len(df_without_duplicates))
+# print("Row count after duplicates removal: ", len(df_without_duplicates))
 
-df_deleted_posts_removed = df_without_duplicates[df_without_duplicates.body != "[deleted]"]
+# df_deleted_posts_removed = df_without_duplicates[df_without_duplicates.body != "[deleted]"]
 
-print("Row count after deleted posts removal: ", len(df_deleted_posts_removed))
+# print("Row count after deleted posts removal: ", len(df_deleted_posts_removed))
 
-df_empty_posts_removed = df_deleted_posts_removed[df_deleted_posts_removed.body != ""]
+# df_empty_posts_removed = df_deleted_posts_removed[df_deleted_posts_removed.body != ""]
 
-print("Row count after empty posts removal: ", len(df_empty_posts_removed))
+# print("Row count after empty posts removal: ", len(df_empty_posts_removed))
 
-df_without_bot_posts = remove_bots_posts(df_empty_posts_removed)
+# df_without_bot_posts = remove_bots_posts(df_empty_posts_removed)
 
-print("Row count after bots' posts removal: ", len(df_without_bot_posts))
+# print("Row count after bots' posts removal: ", len(df_without_bot_posts))
 
-df_without_undesired_words = remove_undesired_words(df_without_bot_posts)
+# df_without_undesired_words = remove_undesired_words(df_without_bot_posts)
 
-print("Row count after undesired words removal: ", len(df_without_undesired_words))
+# print("Row count after undesired words removal: ", len(df_without_undesired_words))
 
-output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[duplicates_bots_removed]" + FILE_EXTENSION
+# output_filepath = OUTPUT_PATH + get_filename(original_data_path) + "[duplicates_bots_removed]" + FILE_EXTENSION
 
-os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
+# os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
 
-json.dump(df_without_undesired_words.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
+# json.dump(df_without_undesired_words.to_dict(orient='records'), open(output_filepath, WRITE_MODE))
 
-print("Data without duplicates dumped to ", output_filepath)
+# print("Data without duplicates dumped to ", output_filepath)
 
-data = np.array(df_without_undesired_words[field_of_interest], dtype = 'object')
+data = np.array(original_data_frame[field_of_interest], dtype = 'object')
 
 processor = Preprocessor(posCategories, lang, lemmatize_activated)
 
@@ -118,13 +118,9 @@ processed_data = processor.preprocess(data, stopwords_file)
 
 print("Size of data after preprocessing: ", len(processed_data))
 
-df_after_preprocessing = df_without_undesired_words.assign(body=processed_data)
+df_after_preprocessing = original_data_frame.assign(body=processed_data)
 
-df_after_removal_of_undesired_words = remove_undesired_words(df_after_preprocessing)
-
-print("Row count after undesired words removal: ", len(df_without_undesired_words))
-
-df_after_preprocessing = df_after_removal_of_undesired_words[df_after_removal_of_undesired_words['body'].map(lambda field: len(field)) > 0]
+df_after_preprocessing = df_after_preprocessing[df_after_preprocessing['body'].map(lambda field: len(field)) > 0]
 
 print(f'Row count after removal of rows with empty "{field_of_interest}" fields: {len(df_after_preprocessing)}')
 
